@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TTS MP3 Maker</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <h1>TTS MP3 Maker</h1>
+            <p>텍스트를 음성 MP3 파일로 변환합니다.</p>
+          </div>
+          <div class="status-pill" id="voiceStatus">음성 불러오는 중</div>
+        </header>
+
+        <form class="editor" id="ttsForm">
+          <label class="field field-text">
+            <span>텍스트</span>
+            <textarea id="textInput" maxlength="8000" placeholder="여기에 읽을 문장을 입력하세요.">안녕하세요. 텍스트를 입력하면 음성 MP3 파일로 만들어주는 앱입니다.</textarea>
+          </label>
+
+          <div class="controls">
+            <label class="field">
+              <span>엔진</span>
+              <select id="providerSelect">
+                <option value="openai">고품질 AI 음성</option>
+                <option value="gemini">Gemini TTS</option>
+                <option value="local">Mac 기본 음성</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>음성</span>
+              <select id="voiceSelect"></select>
+            </label>
+
+            <label class="field" id="speedField">
+              <span>속도 <strong id="speedValue">1.0x</strong></span>
+              <input id="speedInput" type="range" min="0.5" max="1.5" step="0.05" value="1" />
+            </label>
+
+            <label class="field" id="rateField" hidden>
+              <span>속도 <strong id="rateValue">180</strong></span>
+              <input id="rateInput" type="range" min="80" max="320" value="180" />
+            </label>
+          </div>
+
+          <label class="field" id="styleField">
+            <span>말투</span>
+            <textarea id="styleInput" class="style-input" maxlength="1000" placeholder="예: 한국어 강의 내레이션처럼 자연스럽고 따뜻하게, 문장 끝을 너무 과장하지 말고 또렷하게 말해줘.">한국어 강의 내레이션처럼 자연스럽고 따뜻하게, 문장 끝을 너무 과장하지 말고 또렷하게 말해줘.</textarea>
+          </label>
+
+          <div class="action-row">
+            <div class="meta"><span id="charCount">0</span> / <span id="charLimit">4,096</span>자</div>
+            <button id="submitButton" type="submit">MP3 만들기</button>
+          </div>
+        </form>
+
+        <section class="result" id="resultPanel" hidden>
+          <div>
+            <h2>완성된 MP3</h2>
+            <p id="resultMeta"></p>
+          </div>
+          <audio id="audioPlayer" controls></audio>
+          <a class="download-button" id="downloadLink" href="#" download>다운로드</a>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
