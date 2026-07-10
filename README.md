@@ -61,6 +61,10 @@ CF_ACCESS_CLIENT_SECRET=...
 저장하고 브라우저 코드나 GitHub 저장소에는 넣지 않습니다. 이 값이 없으면 Vercel
 화면에서 로컬 복제 엔진은 숨겨지고 OpenAI/Gemini 엔진만 표시됩니다.
 
+로컬 Node 서버는 기본적으로 `127.0.0.1`에만 바인딩됩니다. Cloudflare Tunnel은
+`http://127.0.0.1:3107`을 원본 서비스로 사용하며, 서버 포트를 같은 네트워크에 직접
+공개하지 않습니다. 다른 바인딩 주소가 꼭 필요한 경우에만 `HOST` 환경변수를 지정하세요.
+
 Supabase 환경 변수를 넣으면 생성 파일을 Storage에 저장하고 공개 URL을 반환합니다. Supabase를 설정하지 않으면 Vercel 함수가 오디오를 base64 data URL로 반환해 브라우저에서 바로 재생/다운로드합니다.
 
 ## 요구 사항

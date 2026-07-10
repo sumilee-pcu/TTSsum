@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 
 const PORT = Number(process.env.PORT || 3107);
+const HOST = process.env.HOST || "127.0.0.1";
 const ROOT = resolve(process.cwd());
 const PUBLIC_DIR = join(ROOT, "public");
 const OUTPUT_DIR = join(ROOT, "outputs");
@@ -129,8 +130,8 @@ async function main() {
     }
   });
 
-  server.listen(PORT, () => {
-    console.log(`TTS MP3 app: http://127.0.0.1:${PORT}`);
+  server.listen(PORT, HOST, () => {
+    console.log(`TTS MP3 app: http://${HOST}:${PORT}`);
   });
 }
 
