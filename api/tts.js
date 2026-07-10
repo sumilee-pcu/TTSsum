@@ -9,13 +9,31 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
-    const provider = ["openai", "gemini"].includes(body.provider) ? body.provider : "openai";
+    const provider = ["openai", "gemini", "clone"].includes(body.provider) ? body.provider : "openai";
     const text = typeof body.text === "string" ? body.text.trim() : "";
     const style = typeof body.style === "string" ? body.style.trim() : "";
-    const fileName = `tts-${new Date().toISOString().replace(/[:.]/g, "-")}.${provider === "openai" ? "mp3" : "wav"}`;
+    const fileName = `tts-${new Date().toISOString().replace(/[:.]/g, "-")}.${provider === "gemini" ? "wav" : "mp3"}`;
 
     if (!text) {
       res.status(400).json({ error: "변환할 텍스트를 입력하세요." });
+      return;
+    }
+
+    if (provider === "clone") {
+      const voice = "sumilee-latest";
+      const speed = clampFloat(Number(body.speed || 1), 0.5, 1.5);
+      const audio = await createLocalCloneSpeech({ text, voice, speed });
+      const upload = await uploadToSupabase({ fileName, contentType: "audio/mpeg", audio });
+      res.status(200).json({
+        fileName,
+        url: upload.url,
+        dataUrl: upload.url ? undefined : `data:audio/mpeg;base64,${Buffer.from(audio).toString("base64")}`,
+        provider,
+        voice,
+        model: "Qwen3-TTS on M5 Max",
+        speed,
+        size: audio.byteLength
+      });
       return;
     }
 
@@ -52,6 +70,38 @@ export default async function handler(req, res) {
     console.error(error);
     res.status(500).json({ error: error.message || "음성 파일을 만들지 못했습니다." });
   }
+}
+
+async function createLocalCloneSpeech({ text, voice, speed }) {
+  const baseUrl = process.env.LOCAL_TTS_API_URL?.replace(/\/$/, "");
+  if (!baseUrl) {
+    throw new Error("LOCAL_TTS_API_URL이 필요합니다.");
+  }
+  if (text.length > 2000) {
+    throw new Error("내 목소리 로컬 합성은 한 번에 2,000자까지 변환할 수 있습니다.");
+  }
+
+  const headers = { "content-type": "application/json" };
+  if (process.env.CF_ACCESS_CLIENT_ID && process.env.CF_ACCESS_CLIENT_SECRET) {
+    headers["CF-Access-Client-Id"] = process.env.CF_ACCESS_CLIENT_ID;
+    headers["CF-Access-Client-Secret"] = process.env.CF_ACCESS_CLIENT_SECRET;
+  }
+
+  const response = await fetch(`${baseUrl}/api/tts`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ provider: "clone", text, voice, speed })
+  });
+  const data = await response.json().catch(async () => ({ error: await response.text() }));
+  if (!response.ok || !data.url) {
+    throw new Error(data.error || `로컬 TTS 요청 실패: ${response.status}`);
+  }
+
+  const audioResponse = await fetch(new URL(data.url, `${baseUrl}/`), { headers });
+  if (!audioResponse.ok) {
+    throw new Error(`로컬 TTS 결과 다운로드 실패: ${audioResponse.status}`);
+  }
+  return Buffer.from(await audioResponse.arrayBuffer());
 }
 
 async function createOpenAiSpeech({ text, voice, style, speed }) {

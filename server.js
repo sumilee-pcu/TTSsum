@@ -9,6 +9,10 @@ const ROOT = resolve(process.cwd());
 const PUBLIC_DIR = join(ROOT, "public");
 const OUTPUT_DIR = join(ROOT, "outputs");
 const TMP_DIR = join(ROOT, ".tmp");
+const LOCAL_CLONE_PYTHON = join(ROOT, ".venv-mlx-tts", "bin", "python");
+const LOCAL_CLONE_REFERENCE = join(ROOT, "local-voice", "reference", "sumilee_latest.wav");
+const LOCAL_CLONE_MODEL = process.env.LOCAL_CLONE_MODEL || "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit";
+const LOCAL_CLONE_REF_TEXT = "1회차 화요일에 김남희 선생님 강의를 대부분 들으셨을 텐데요. 이번 연수도 강의형이 아니라 같이 해보는 실습과 그리고 또 이제 어느 절차로 진행이 되는지 그 부분 안내를 집중적으로 해 드리도록 하겠습니다.";
 let openAiTtsModel = process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts";
 let geminiTtsModel = process.env.GEMINI_TTS_MODEL || "gemini-3.1-flash-tts-preview";
 const OPENAI_VOICES = [
@@ -94,6 +98,13 @@ async function main() {
           local: {
             enabled: true,
             voices: await getVoices()
+          },
+          clone: {
+            enabled: await localCloneReady(),
+            model: LOCAL_CLONE_MODEL,
+            voices: [
+              { name: "sumilee-latest", locale: "ko-KR", sample: "최신 강의에서 추출한 이수미 교수 음성" }
+            ]
           }
         });
       }
@@ -127,7 +138,7 @@ async function handleTts(req, res) {
   const body = await readJson(req);
   const text = typeof body.text === "string" ? body.text.trim() : "";
   const voice = typeof body.voice === "string" ? body.voice.trim() : "";
-  const provider = ["openai", "gemini", "local"].includes(body.provider) ? body.provider : "openai";
+  const provider = ["openai", "gemini", "local", "clone"].includes(body.provider) ? body.provider : "openai";
   const style = typeof body.style === "string" ? body.style.trim() : "";
   const speed = clampFloat(Number(body.speed || 1), 0.25, 4);
   const rate = clamp(Number(body.rate || 180), 80, 320);
@@ -144,6 +155,10 @@ async function handleTts(req, res) {
     return json(res, 400, { error: "Gemini 음성을 쓰려면 GEMINI_API_KEY가 필요합니다. .env 파일에 키를 넣고 서버를 다시 시작하세요." });
   }
 
+  if (provider === "clone" && !(await localCloneReady())) {
+    return json(res, 500, { error: "로컬 복제 음성 환경이나 참조 음성을 찾지 못했습니다." });
+  }
+
   if (text.length > 4096 && provider === "openai") {
     return json(res, 400, { error: "고품질 음성은 한 번에 4,096자까지 변환할 수 있습니다." });
   }
@@ -154,6 +169,10 @@ async function handleTts(req, res) {
 
   if (text.length > 8000 && provider === "local") {
     return json(res, 400, { error: "Mac 기본 음성은 한 번에 8,000자까지 변환할 수 있습니다." });
+  }
+
+  if (text.length > 2000 && provider === "clone") {
+    return json(res, 400, { error: "내 목소리 로컬 합성은 한 번에 2,000자 이하로 나눠 변환하세요." });
   }
 
   const id = randomUUID();
@@ -197,6 +216,41 @@ async function handleTts(req, res) {
     } catch (error) {
       console.error(error);
       return json(res, 500, { error: "Gemini 음성 파일을 만들지 못했습니다. API 키, 지역/결제 상태, 네트워크를 확인하세요." });
+    } finally {
+      await Promise.allSettled([fs.rm(wavPath, { force: true })]);
+    }
+  }
+
+  if (provider === "clone") {
+    const wavPrefix = `clone-${id}`;
+    const wavPath = join(TMP_DIR, `${wavPrefix}_000.wav`);
+    try {
+      await run(LOCAL_CLONE_PYTHON, [
+        "-m", "mlx_audio.tts.generate",
+        "--model", LOCAL_CLONE_MODEL,
+        "--text", text,
+        "--lang_code", "Korean",
+        "--ref_audio", LOCAL_CLONE_REFERENCE,
+        "--ref_text", LOCAL_CLONE_REF_TEXT,
+        "--speed", String(speed),
+        "--output_path", TMP_DIR,
+        "--file_prefix", wavPrefix,
+        "--audio_format", "wav"
+      ]);
+      await run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-i", wavPath, "-codec:a", "libmp3lame", "-q:a", "2", mp3Path]);
+      const stat = await fs.stat(mp3Path);
+      return json(res, 200, {
+        fileName: mp3Name,
+        url: `/outputs/${mp3Name}`,
+        provider,
+        voice: "sumilee-latest",
+        model: LOCAL_CLONE_MODEL,
+        speed,
+        size: stat.size
+      });
+    } catch (error) {
+      console.error(error);
+      return json(res, 500, { error: "내 목소리 로컬 음성을 만들지 못했습니다. 서버 로그에서 MLX/Metal 상태를 확인하세요." });
     } finally {
       await Promise.allSettled([fs.rm(wavPath, { force: true })]);
     }
@@ -331,6 +385,15 @@ async function loadEnv() {
 }
 
 let voiceCache = null;
+async function localCloneReady() {
+  try {
+    await Promise.all([fs.access(LOCAL_CLONE_PYTHON), fs.access(LOCAL_CLONE_REFERENCE)]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function getVoices() {
   if (voiceCache) return voiceCache;
   const output = await run("say", ["-v", "?"]);

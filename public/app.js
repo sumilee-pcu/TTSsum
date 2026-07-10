@@ -67,7 +67,11 @@ form.addEventListener("submit", async (event) => {
     audioPlayer.src = audioUrl;
     downloadLink.href = audioUrl;
     downloadLink.download = data.fileName;
-    const speedText = data.provider === "openai" ? `${data.speed}x` : data.provider === "gemini" ? data.model : `${data.rate} wpm`;
+    const speedText = data.provider === "openai" || data.provider === "clone"
+      ? `${data.speed}x`
+      : data.provider === "gemini"
+        ? data.model
+        : `${data.rate} wpm`;
     resultMeta.textContent = `${data.voice} · ${speedText} · ${formatBytes(data.size)}`;
     resultPanel.hidden = false;
     setStatus("완료", false);
@@ -85,6 +89,14 @@ async function loadVoices() {
     voiceData = await response.json();
     if (!response.ok) throw new Error(voiceData.error || "음성 목록을 불러오지 못했습니다.");
 
+    const cloneOption = providerSelect.querySelector('option[value="clone"]');
+    const cloneEnabled = Boolean(voiceData.clone?.enabled);
+    cloneOption.hidden = !cloneEnabled;
+    if (cloneEnabled) {
+      providerSelect.value = "clone";
+    } else if (providerSelect.value === "clone") {
+      providerSelect.value = "openai";
+    }
     renderVoices();
   } catch (error) {
     setStatus(error.message, true);
@@ -95,7 +107,12 @@ function renderVoices() {
   if (!voiceData) return;
   const isOpenAi = providerSelect.value === "openai";
   const isGemini = providerSelect.value === "gemini";
-  const providerData = isOpenAi ? voiceData.openai : isGemini ? voiceData.gemini : voiceData.local;
+  const isClone = providerSelect.value === "clone";
+  const providerData = isOpenAi ? voiceData.openai : isGemini ? voiceData.gemini : isClone ? voiceData.clone : voiceData.local;
+  if (!providerData) {
+    setStatus("선택한 음성 엔진을 사용할 수 없습니다.", true);
+    return;
+  }
   const voices = providerData.voices;
   voiceSelect.replaceChildren(
     ...voices.map((voice) => {
@@ -104,25 +121,27 @@ function renderVoices() {
       option.textContent = `${voice.name} (${voice.sample || voice.locale})`;
       if (isOpenAi && voice.name === "marin") option.selected = true;
       if (isGemini && voice.name === "Kore") option.selected = true;
-      if (!isOpenAi && voice.locale.startsWith("ko")) option.selected = true;
+      if (!isOpenAi && !isGemini && voice.locale.startsWith("ko")) option.selected = true;
       return option;
     })
   );
 
-  speedField.hidden = !isOpenAi;
+  speedField.hidden = !isOpenAi && !isClone;
   styleField.hidden = !isOpenAi && !isGemini;
-  rateField.hidden = isOpenAi || isGemini;
-  const limit = isOpenAi ? 4096 : isGemini ? 24000 : 8000;
+  rateField.hidden = isOpenAi || isGemini || isClone;
+  const limit = isOpenAi ? 4096 : isGemini ? 24000 : isClone ? 2000 : 8000;
   textInput.maxLength = limit;
   charLimit.textContent = limit.toLocaleString("ko-KR");
   updateCounts();
 
-  if (isOpenAi && !providerData.enabled) {
+  if (isClone && !providerData.enabled) {
+    setStatus("로컬 복제 음성 환경 확인 필요", true);
+  } else if (isOpenAi && !providerData.enabled) {
     setStatus("OPENAI_API_KEY 필요", true);
   } else if (isGemini && !providerData.enabled) {
     setStatus("GEMINI_API_KEY 필요", true);
   } else {
-    setStatus(isOpenAi || isGemini ? `${providerData.model}` : `${voices.length}개 Mac 음성`, false);
+    setStatus(isOpenAi || isGemini || isClone ? `${providerData.model}` : `${voices.length}개 Mac 음성`, false);
   }
 }
 

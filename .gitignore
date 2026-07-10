@@ -1,5 +1,10 @@
 .env
+.DS_Store
 .tmp/
 outputs/
+.venv-mlx-tts/
+local-voice/models/
+local-voice/outputs/
+local-voice/reference/*.wav
 node_modules/
 .vercel/

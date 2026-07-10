@@ -67,6 +67,13 @@ export default function handler(req, res) {
     local: {
       enabled: false,
       voices: []
+    },
+    clone: {
+      enabled: Boolean(process.env.LOCAL_TTS_API_URL),
+      model: "Qwen3-TTS on M5 Max",
+      voices: [
+        { name: "sumilee-latest", locale: "ko-KR", sample: "최신 강의에서 추출한 이수미 교수 음성" }
+      ]
     }
   });
 }
