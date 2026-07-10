@@ -1,0 +1,5 @@
+1회차 화요일에 김남희 선생님 강의를 대부분 들으셨을 텐데요. 이번 연수도 강의형이 아니라 같이 해보는 실습과 그리고 또 이제 어느 절차로 진행이 되는지 그 부분 안내를 집중적으로 해 드리도록 하겠습니다.
+
+출처: https://www.youtube.com/watch?v=whrxoUZA6-M
+구간: 00:00:33.239 ~ 00:00:52.510
+전처리: 24 kHz, mono, PCM 16-bit, high-pass 70 Hz, loudness normalization -18 LUFS
