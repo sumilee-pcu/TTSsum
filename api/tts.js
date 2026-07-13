@@ -73,7 +73,7 @@ export default async function handler(req, res) {
 }
 
 async function createLocalCloneSpeech({ text, voice, speed }) {
-  const baseUrl = process.env.LOCAL_TTS_API_URL?.replace(/\/$/, "");
+  const baseUrl = process.env.LOCAL_TTS_API_URL?.trim().replace(/\/$/, "");
   if (!baseUrl) {
     throw new Error("LOCAL_TTS_API_URL이 필요합니다.");
   }
@@ -81,10 +81,12 @@ async function createLocalCloneSpeech({ text, voice, speed }) {
     throw new Error("내 목소리 로컬 합성은 한 번에 2,000자까지 변환할 수 있습니다.");
   }
 
+  const clientId = normalizeAccessCredential(process.env.CF_ACCESS_CLIENT_ID, "CF-Access-Client-Id");
+  const clientSecret = normalizeAccessCredential(process.env.CF_ACCESS_CLIENT_SECRET, "CF-Access-Client-Secret");
   const headers = { "content-type": "application/json" };
-  if (process.env.CF_ACCESS_CLIENT_ID && process.env.CF_ACCESS_CLIENT_SECRET) {
-    headers["CF-Access-Client-Id"] = process.env.CF_ACCESS_CLIENT_ID;
-    headers["CF-Access-Client-Secret"] = process.env.CF_ACCESS_CLIENT_SECRET;
+  if (clientId && clientSecret) {
+    headers["CF-Access-Client-Id"] = clientId;
+    headers["CF-Access-Client-Secret"] = clientSecret;
   }
 
   const response = await fetch(`${baseUrl}/api/tts`, {
@@ -238,4 +240,13 @@ function createWavBuffer(pcm, channels = 1, sampleRate = 24000, bitsPerSample = 
 function clampFloat(value, min, max) {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
+}
+
+function normalizeAccessCredential(value, headerName) {
+  const credential = String(value || "").trim();
+  const prefix = `${headerName}:`;
+  if (credential.toLowerCase().startsWith(prefix.toLowerCase())) {
+    return credential.slice(prefix.length).trim();
+  }
+  return credential;
 }
