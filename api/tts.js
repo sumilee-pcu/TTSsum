@@ -83,6 +83,9 @@ async function createLocalCloneSpeech({ text, voice, speed }) {
 
   const clientId = normalizeAccessCredential(process.env.CF_ACCESS_CLIENT_ID, "CF-Access-Client-Id");
   const clientSecret = normalizeAccessCredential(process.env.CF_ACCESS_CLIENT_SECRET, "CF-Access-Client-Secret");
+  if (clientId && !/^[a-f0-9]{32}\.access$/i.test(clientId)) {
+    throw new Error("CF_ACCESS_CLIENT_ID 형식이 올바르지 않습니다.");
+  }
   const headers = { "content-type": "application/json" };
   if (clientId && clientSecret) {
     headers["CF-Access-Client-Id"] = clientId;
@@ -244,9 +247,16 @@ function clampFloat(value, min, max) {
 
 function normalizeAccessCredential(value, headerName) {
   const credential = String(value || "").trim();
-  const prefix = `${headerName}:`;
-  if (credential.toLowerCase().startsWith(prefix.toLowerCase())) {
-    return credential.slice(prefix.length).trim();
+  const headerIndex = credential.toLowerCase().indexOf(headerName.toLowerCase());
+  if (headerIndex >= 0) {
+    const colonIndex = credential.indexOf(":", headerIndex + headerName.length);
+    if (colonIndex >= 0) {
+      return stripCredentialDelimiters(credential.slice(colonIndex + 1));
+    }
   }
-  return credential;
+  return stripCredentialDelimiters(credential);
+}
+
+function stripCredentialDelimiters(value) {
+  return value.trim().replace(/^["'`]+/, "").replace(/["'`,}]+$/, "").trim();
 }
