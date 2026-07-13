@@ -92,7 +92,13 @@ async function createLocalCloneSpeech({ text, voice, speed }) {
     headers,
     body: JSON.stringify({ provider: "clone", text, voice, speed })
   });
-  const data = await response.json().catch(async () => ({ error: await response.text() }));
+  const responseText = await response.text();
+  let data = {};
+  try {
+    data = responseText ? JSON.parse(responseText) : {};
+  } catch {
+    data = {};
+  }
   if (!response.ok || !data.url) {
     throw new Error(data.error || `로컬 TTS 요청 실패: ${response.status}`);
   }
